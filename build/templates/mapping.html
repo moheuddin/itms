@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="container py-5">
+
+        <!-- Search Row -->
+        <div class="row justify-content-start align-items-end mb-3">
+            <div class="col-md-4" id="mapping-search-block">
+                <label for="mappingSelect" class="form-label">Select Section:</label>
+                <select id="mappingSelect" class="form-control">
+                    <option value="">-- Select --</option>
+                    {% for val in mapping_values %}
+                        <option value="{{ val|e }}">{{ val|e }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <button id="search-btn" class="btn btn-success mt-3">Search</button>
+            </div>
+        </div>
+
+        <!-- Results Table -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <table id="results-table" class="table table-bordered table-striped" style="width:100%; display:none;">
+                    <thead>
+                    <tr>
+                        <th>আয়কর অধ্যাদেশ, ১৯৮৪</th>
+                        <th>আয়কর আইন, ২০২৩</th>
+                    </tr>
+                    </thead>
+                    <tbody id="table-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS -->
+    <script>
+        $(document).ready(function () {
+
+            // Initialize Choices.js for searchable dropdown
+            new Choices('#mappingSelect', {
+                searchEnabled: true,
+                itemSelectText: '',
+                placeholder: true,
+                placeholderValue: 'Select Mapping',
+                removeItemButton: true,
+                allowHTML: true
+            });
+
+            // Search button click
+            $('#search-btn').click(function () {
+                let searchValue = $('#mappingSelect').val();
+
+                if (!searchValue) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Oops!',
+                        text: 'Please select a mapping value.',
+                        confirmButtonColor: '#28a745'
+                    });
+                    return;
+                }
+
+                $.ajax({
+                    url: '/search-map',
+                    type: 'POST',
+                    data: {search_value: searchValue},
+                    success: function (data) {
+                        $('#table-body').empty();
+                        $('#results-table').show();
+
+                        if (data.length > 0) {
+                            data.forEach(row => {
+                                let tr = '<tr>';
+                                tr += '<td>' + (row['incometax84'] || '') + '</td>';
+                                tr += '<td>' + (row['incomeact23'] || '') + '</td>';
+                                tr += '</tr>';
+                                $('#table-body').append(tr);
+                            });
+                        } else {
+                            $('#table-body').append('<tr><td colspan="2">No results found</td></tr>');
+                        }
+                    },
+                    error: function (xhr, status, error) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'An error occurred while fetching data.',
+                            confirmButtonColor: '#28a745'
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+{% endblock %}

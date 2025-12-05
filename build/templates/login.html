@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <h1>Login</h1>
+                <div id="message"></div>
+                <form id="LoginForm" name="LoginForm" method="POST">
+                    <div class="mb-2">
+                        <label for="email" class="form-label">Username</label>
+                        <input name="email" type="email" class="form-control" id="email" value="admin"
+                               placeholder="Enter your username">
+                    </div>
+                    <div class="mb-1">
+                        <label for="password" class="form-label">Password</label>
+                        <input name="password" type="password" class="form-control" value="admin" id="password"
+                               placeholder="Enter your password">
+                    </div>
+
+                    <div class="row align-items-center" style="display:none;">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="captcha" class="form-label">Enter Captcha Code</label>
+                                <input name="captcha" type="text" class="form-control" id="captcha"
+                                       placeholder="Enter your captcha here">
+                            </div>
+                            <img id="captchaImage" style="border: 1px solid #000; border-radius: 5px;"
+                                 src="{{ url_for('public.captcha') }}" alt="CAPTCHA Image" class="img-fluid mb-2">
+                            <button id="refreshCaptcha" class="btn btn-secondary mb-2">
+                                <i class="fa-solid fa-rotate-right"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="col-md-6"></div>
+                    </div>
+
+                    <button id="SubmitButton" type="button" class="btn btn-success mt-2">Login</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        #refreshCaptcha {
+            height: 47px;
+            margin-top: 7px;
+        }
+    </style>
+
+    <script>
+        document.getElementById('refreshCaptcha').addEventListener('click', function (event) {
+            event.preventDefault();
+            var imgElement = document.getElementById('captchaImage');
+            imgElement.src = '{{ url_for("public.captcha") }}?' + new Date().getTime(); // prevent caching
+        });
+
+        $(document).ready(function () {
+            $('#SubmitButton').click(function () {
+                var formData = {
+                    email: $('#email').val(),
+                    password: $('#password').val(),
+                    captcha: $('#captcha').val()
+                };
+
+                $.ajax({
+                    type: 'POST',
+                    url: '{{ url_for("auth.verify_user") }}', // Update based on your blueprint
+                    data: formData,
+                    dataType: 'json',
+                    success: function (data) {
+                        if (data.status === 'failed' && data.errors.length > 0) {
+                            Swal.fire({
+                                title: 'Error!',
+                                text: data.errors[0],
+                                icon: 'error',
+                                confirmButtonText: 'OK'
+                            });
+                            // Refresh captcha on error
+                            var imgElement = document.getElementById('captchaImage');
+                            imgElement.src = '{{ url_for("public.captcha") }}?' + new Date().getTime();
+                        }
+
+                        if (data.status === 'success') {
+                            if (data.role === 'admin') {
+                                window.location.href = '{{ url_for("admin.admin_index") }}'; // Admin endpoint
+                            } else {
+                                window.location.href = '{{ url_for("auth.user_profile") }}'; // User endpoint
+                            }
+                        }
+                    },
+                    error: function (xhr, status, error) {
+                        console.error(xhr.responseText);
+                        Swal.fire({
+                            title: 'Error!',
+                            text: 'Something went wrong. Please try again.',
+                            icon: 'error',
+                            confirmButtonText: 'OK'
+                        });
+                    }
+                });
+            });
+
+            // Trigger login on Enter key
+            $('#LoginForm input').keypress(function (event) {
+                if (event.which === 13) {
+                    event.preventDefault();
+                    $('#SubmitButton').click();
+                }
+            });
+        });
+    </script>
+{% endblock %}

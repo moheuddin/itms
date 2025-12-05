@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block content %}
+    <div class="container">
+        <div id="search-items" class="row mt-3 align-items-end mb-3">
+
+            <!-- Section Dropdown -->
+            <div class="col-md-2" id="section">
+                <label for="sectionSelect" class="form-label">Select Section:</label>
+                <select id="sectionSelect" name="section" class="form-control">
+                    <option value="">-- Select Section --</option>
+                    {% for sec in sections %}
+                        <option value="{{ sec|e }}">{{ sec|e }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Year Dropdown -->
+            <div class="col-md-2" id="financial-year-block">
+                <label for="yearSelect" class="form-label">Financial Year:</label>
+                <select id="yearSelect" name="year" class="form-control">
+                    <option value="">-- Select --</option>
+                </select>
+            </div>
+
+            <!-- Title Dropdown -->
+            <div class="col-md-4" id="search-block">
+                <label for="titleSelect" class="form-label">Select Heading:</label>
+                <select id="titleSelect" name="titleSelect" class="form-control">
+                    <option value="">-- Select --</option>
+                </select>
+            </div>
+
+            <!-- Search Content -->
+            <div class="col-md-3" id="search-content-block">
+                <label for="search-content">Search Content:</label>
+                <input type="text" id="search-content" class="form-control" placeholder="Type to search..."/>
+            </div>
+
+            <!-- Search Button -->
+            <div class="col-md-1 mt-2">
+                <button id="searchBtn" class="btn btn-success">Search</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="container">
+        <div class="row mt-3">
+            <div class="col-md-12">
+                <div id="search-results"></div>
+                <div id="related-results"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS -->
+    <script>
+        let sectionChoices, yearChoices, titleChoices;
+
+        document.addEventListener("DOMContentLoaded", function () {
+            sectionChoices = new Choices("#sectionSelect", {
+                searchEnabled: true, itemSelectText: "", placeholder: true, placeholderValue: "Select",
+                removeItemButton: true, allowHTML: true
+            });
+            yearChoices = new Choices("#yearSelect", {
+                searchEnabled: true, itemSelectText: "", placeholder: true, placeholderValue: "Select",
+                removeItemButton: true, allowHTML: true
+            });
+            titleChoices = new Choices("#titleSelect", {
+                searchEnabled: true, itemSelectText: "", placeholder: true, placeholderValue: "Select",
+                removeItemButton: true, allowHTML: true
+            });
+
+            // Load titles on page load
+            $.getJSON("{{ url_for('admin_document.articles_api') }}", {mode: "getTitle"}, function (response) {
+                titleChoices.setChoices(
+                    (response.titles || []).map(t => ({value: t, label: t})), 'value', 'label', true
+                );
+            });
+
+            // Section change: populate years and titles
+            $('#sectionSelect').on('change', function () {
+                let selectedSection = $(this).val();
+                if (!selectedSection) return;
+
+                $.getJSON("{{ url_for('admin_document.articles_api') }}", {
+                    mode: "years",
+                    section: selectedSection
+                }, function (response) {
+                    yearChoices.clearChoices().removeActiveItems();
+                    yearChoices.setChoices((response.years || []).map(y => ({
+                        value: y,
+                        label: y
+                    })), 'value', 'label', true);
+
+                    titleChoices.clearChoices().removeActiveItems();
+                    titleChoices.setChoices((response.titles || []).map(t => ({
+                        value: t,
+                        label: t
+                    })), 'value', 'label', true);
+                });
+            });
+
+            // Search button
+            $('#searchBtn').on('click', function () {
+                let section = sectionChoices.getValue(true);
+                let year = yearChoices.getValue(true);
+                let title = titleChoices.getValue(true);
+                let content = $('#search-content').val().trim();
+
+                if (!section && !year && !title && !content) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Oops!',
+                        text: 'Please type something or select filters to search.',
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#28a745'  // Green button
+                    });
+
+                    return;
+                }
+
+
+                $.getJSON("{{ url_for('admin_document.articles_api') }}", {
+                    mode: "search",
+                    section, year, title, content
+                }, function (response) {
+                    let htmlArticles = '', htmlRelated = '';
+                    const results = response.results || [];
+                    if (results.length) {
+                        const first = results[0];
+                        htmlArticles = `<div class="card mb-3"><div class="card-body"><h4 class="card-title">${first.section} — ${first.title}</h4></div></div>`;
+                        htmlRelated = `<table class="table table-bordered table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>ধারা</th>
+                                        <th style="width:80px;text-align:center;">করবর্ষ</th>
+                                        <th>বর্ণনা</th>
+                                    </tr>
+                                </thead><tbody>`;
+                        results.forEach(item => {
+                            htmlRelated += `<tr>
+                        <td><span class="text-danger">${item.section}</span></td>
+                        <td style="text-align:center;"><span class="text-danger">${item.assessment_year}</span></td>
+                        <td>${item.content}</td>
+                    </tr>`;
+                            if (item.same_as) item.same_as.forEach(s => {
+                                htmlRelated += `<tr>
+                            <td><span class="text-danger">${item.section}</span></td>
+                            <td><span class="text-danger">${s}</span></td>
+                            <td>Same as: ${item.assessment_year}</td>
+                        </tr>`;
+                            });
+                        });
+                        htmlRelated += '</tbody></table>';
+                    } else {
+                        htmlArticles = '<p class="text-muted">No articles found.</p>';
+                        htmlRelated = '<p class="text-muted">No related assessment content found.</p>';
+                    }
+
+                    $('#search-results').html(htmlArticles);
+                    $('#related-results').html(htmlRelated);
+
+                    if ($('#search-content').length) highlightText('#related-results', $('#search-content').val().trim());
+                });
+            });
+
+        }); // DOMContentLoaded
+
+        function highlightText(containerSelector, text) {
+            if (!text) return;
+            const container = document.querySelector(containerSelector);
+            const innerHTML = container.innerHTML;
+            const escapedText = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(escapedText, 'gi');
+            container.innerHTML = innerHTML.replace(regex, m => `<span class="highlighted">${m}</span>`);
+        }
+    </script>
+
+    <style>
+        .highlighted {
+            background-color: yellow;
+        }
+    </style>
+{% endblock %}
