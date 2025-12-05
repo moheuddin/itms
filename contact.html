@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card shadow-lg rounded-4">
+        <div class="card-body p-4">
+          <h2 class="text-center mb-4">Contact Us</h2>
+          <form id="contactForm">
+            <div class="mb-3">
+              <label for="name" class="form-label">Your Name</label>
+              <input type="text" class="form-control" id="name" name="name" required>
+            </div>
+            <div class="mb-3">
+              <label for="email" class="form-label">Your Email</label>
+              <input type="email" class="form-control" id="email" name="email" required>
+            </div>
+            <div class="mb-3">
+              <label for="message" class="form-label">Your Message</label>
+              <textarea class="form-control" id="message" name="message" rows="5" required></textarea>
+            </div>
+            <div class="mb-3">
+              <label for="captcha" class="form-label">Enter Captcha Code</label>
+              <input name="captcha" type="text" class="form-control" id="captcha" placeholder="Enter captcha" required>
+              <img id="captchaImage" src="{{ url_for('auth.captcha') }}" alt="CAPTCHA Image" class="img-fluid mt-2">
+              <button id="refreshCaptcha" class="btn btn-secondary mt-2">Refresh CAPTCHA</button>
+            </div>
+            <button type="submit" class="btn btn-success">Send Message</button>
+          </form>
+
+          <div id="formResponse" class="mt-3 text-center"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='assets/js/jquery-3.6.0.min.js') }}"></script>
+<script>
+$(function() {
+  $('#contactForm').on('submit', function(e) {
+    e.preventDefault();
+
+    $.ajax({
+      url: "{{ url_for('public.contact') }}",
+      type: 'POST',
+      data: $(this).serialize(),
+      dataType: 'json',
+      success: function(response) {
+        if (response.status === 'success') {
+          $('#formResponse').html('<div class="alert alert-success">' + response.message + '</div>');
+          $('#contactForm')[0].reset();
+        } else {
+          $('#formResponse').html('<div class="alert alert-danger">' + response.message + '</div>');
+        }
+        $('#captchaImage').attr('src', '{{ url_for("auth.captcha") }}?' + new Date().getTime());
+      },
+      error: function() {
+        $('#formResponse').html('<div class="alert alert-danger">Something went wrong. Please try again.</div>');
+      }
+    });
+  });
+
+  $('#refreshCaptcha').on('click', function(e) {
+    e.preventDefault();
+    $('#captchaImage').attr('src', '{{ url_for("auth.captcha") }}?' + new Date().getTime());
+  });
+});
+</script>
+{% endblock %}
